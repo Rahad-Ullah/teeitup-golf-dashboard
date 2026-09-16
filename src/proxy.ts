@@ -16,10 +16,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  // If a refresh token cookie exists and the user is trying to access an auth page, redirect to home page
-  if (token && isAuthPage) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
+  // We no longer redirect away from auth pages in the proxy. The cookie might
+  // exist but be revoked/expired. It's safer to let the client-side AuthContext
+  // verify the session and redirect them to the dashboard if it's truly valid.
 
   return NextResponse.next();
 }

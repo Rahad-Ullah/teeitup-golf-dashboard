@@ -25,6 +25,26 @@ interface FetchOptions extends Omit<RequestInit, "body"> {
   body?: any;
 }
 
+// Singleton refresh state — prevents concurrent refresh races and stops
+// retry attempts once the session is definitively expired for this page load.
+// NOTE: These are module-level so they persist across calls within one page
+// lifetime, but reset on every hard reload (which is exactly what we want).
+let refreshPromise: Promise<string | null> | null = null;
+let sessionExpired = false;
+
+// Called when the refresh endpoint confirms the session is gone.
+// Clears local token state and marks the session as expired so no
+// further refresh attempts are made. Does NOT redirect — the route
+// guard in (CommonLayout)/layout.tsx handles that via router.replace().
+const clearClientSession = () => {
+  sessionExpired = true;
+  refreshPromise = null;
+  setClientToken("");
+  if (typeof window !== "undefined") {
+    window.sessionStorage.clear();
+  }
+};
+
 // React cache ensures this runs at most once per SSR request
 const getServerAccessToken = cache(async (cookieHeader: string): Promise<string | null> => {
   try {
@@ -46,7 +66,7 @@ const getServerAccessToken = cache(async (cookieHeader: string): Promise<string 
 export async function fetchUrl(endpoint: string, options: FetchOptions = {}): Promise<any> {
   const isServer = typeof window === "undefined";
   const url = `${BASE_URL}${endpoint}`;
-  
+
   const headers = new Headers(options.headers);
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
@@ -71,8 +91,8 @@ export async function fetchUrl(endpoint: string, options: FetchOptions = {}): Pr
   const fetchConfig: RequestInit = {
     ...options,
     headers,
-    body: options.body && !(options.body instanceof FormData) 
-      ? JSON.stringify(options.body) 
+    body: options.body && !(options.body instanceof FormData)
+      ? JSON.stringify(options.body)
       : options.body,
   };
 
@@ -89,9 +109,13 @@ export async function fetchUrl(endpoint: string, options: FetchOptions = {}): Pr
   const sentAuthHeader = headers.has("Authorization");
   if (response.status === 401 && (endpoint === "/auth/refresh-token" || sentAuthHeader)) {
     if (endpoint === "/auth/refresh-token") {
+      // The refresh endpoint itself returned 401 — the session is definitively gone.
+      // Clear token state and throw so the caller (AuthContext.refreshSession) can
+      // set user=null, which triggers the route guard to do router.replace("/sign-in").
+      // We must NOT call window.location.href here — that causes a hard reload which
+      // resets this module's sessionExpired flag and starts the loop all over again.
       if (!isServer) {
-        setClientToken("");
-        window.sessionStorage.clear();
+        clearClientSession();
         try {
           await fetch(`${BASE_URL}/auth/logout`, {
             method: "POST",
@@ -99,16 +123,6 @@ export async function fetchUrl(endpoint: string, options: FetchOptions = {}): Pr
             headers: { [CLIENT_APP_HEADER]: CLIENT_APP },
           });
         } catch {}
-
-        // Only redirect if not already on an auth page to prevent infinite reload loop
-        const pathname = window.location.pathname;
-        const isAuthPage = pathname.startsWith("/sign-in") ||
-                           pathname.startsWith("/forgot-password") ||
-                           pathname.startsWith("/verify-otp") ||
-                           pathname.startsWith("/reset-password");
-        if (!isAuthPage) {
-          window.location.href = "/sign-in";
-        }
       }
     } else {
       if (isServer) {
@@ -121,31 +135,38 @@ export async function fetchUrl(endpoint: string, options: FetchOptions = {}): Pr
             response = await fetch(url, fetchConfig);
           }
         }
-      } else {
-        // Client-side refresh
-        try {
-          const refreshResponse = await fetch(`${BASE_URL}/auth/refresh-token`, {
+      } else if (!sessionExpired) {
+        // Client-side refresh — use a singleton promise so concurrent 401s
+        // all wait on the same single refresh call instead of each firing one.
+        if (!refreshPromise) {
+          refreshPromise = fetch(`${BASE_URL}/auth/refresh-token`, {
             method: "POST",
             credentials: "include",
             headers: { [CLIENT_APP_HEADER]: CLIENT_APP },
-          });
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json();
-            const newAccessToken = refreshData.data?.accessToken;
-            if (newAccessToken) {
-              setClientToken(newAccessToken);
-              headers.set("Authorization", `Bearer ${newAccessToken}`);
-              response = await fetch(url, fetchConfig);
-            } else {
-              throw new Error("No access token returned");
-            }
-          } else {
-            throw new Error("Refresh failed");
-          }
-        } catch (err) {
-          console.error("Client-side token refresh failed, logging out...", err);
-          setClientToken("");
-          window.sessionStorage.clear();
+          })
+            .then(async (r) => {
+              if (!r.ok) throw new Error("Refresh failed");
+              const d = await r.json();
+              const token = d.data?.accessToken;
+              if (!token) throw new Error("No access token returned");
+              return token as string;
+            })
+            .catch(() => null)
+            .finally(() => {
+              refreshPromise = null;
+            });
+        }
+
+        const newAccessToken = await refreshPromise;
+        if (newAccessToken) {
+          setClientToken(newAccessToken);
+          headers.set("Authorization", `Bearer ${newAccessToken}`);
+          response = await fetch(url, fetchConfig);
+        } else {
+          // Refresh returned null — session is gone. Clear state and let the
+          // error propagate so AuthContext.refreshSession sets user=null and
+          // the layout's route guard does the redirect cleanly.
+          clearClientSession();
           try {
             await fetch(`${BASE_URL}/auth/logout`, {
               method: "POST",
@@ -153,22 +174,7 @@ export async function fetchUrl(endpoint: string, options: FetchOptions = {}): Pr
               headers: { [CLIENT_APP_HEADER]: CLIENT_APP },
             });
           } catch {}
-
-          // Only redirect if not already on an auth page to prevent infinite reload loop
-          const pathname = window.location.pathname;
-          const isAuthPage = pathname.startsWith("/sign-in") ||
-                             pathname.startsWith("/forgot-password") ||
-                             pathname.startsWith("/verify-otp") ||
-                             pathname.startsWith("/reset-password");
-          if (!isAuthPage) {
-            window.location.href = "/sign-in";
-          }
-          
-          throw {
-            status: 401,
-            message: "Session expired",
-            data: {},
-          };
+          throw { status: 401, message: "Session expired", data: {} };
         }
       }
     }

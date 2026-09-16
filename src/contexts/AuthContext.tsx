@@ -113,7 +113,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Logout request failed", err);
     } finally {
       setClientToken("");
-      setUser(null);
+      
+      if (typeof window !== "undefined") {
+        // Clear localStorage and sessionStorage completely
+        window.localStorage.clear();
+        window.sessionStorage.clear();
+        
+        // Clear all accessible cookies
+        document.cookie.split(";").forEach((c) => {
+          document.cookie = c
+            .replace(/^ +/, "")
+            .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+        });
+
+        // Force a full page reload to the sign-in page to guarantee all React
+        // state (including anything relying on the now-deleted localStorage) is
+        // wiped cleanly. This prevents white screen crashes during transition.
+        window.location.href = "/sign-in";
+      } else {
+        setUser(null);
+      }
     }
   };
 

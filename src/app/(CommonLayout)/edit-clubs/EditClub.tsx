@@ -246,38 +246,14 @@ const EditClub = () => {
         )
       ).filter((id): id is string => Boolean(id));
 
-      // The backend validates stats/signatureHole/sellingPoints as
-      // all-or-nothing groups — a freshly created club starts with none of
-      // them filled in, so an incomplete group must be left out of the
-      // payload entirely rather than sent half-blank (which would 400 and
-      // block saving the fields that *are* filled in).
+      // Filter out array items that are completely blank across all fields
       const filledSellingPoints = data.sellingPoints.filter(
-        (sp) => sp.title.trim() && sp.description.trim()
+        (sp) => sp.title.trim() || sp.description.trim()
       );
       const filledFacilities = data.facilities.filter(
-        (f) => f.name.trim() && f.description.trim()
+        (f) => f.name.trim() || f.description.trim()
       );
-      const filledHoleVideos = data.holeVideos.filter((v) => v.holeNumber > 0 && v.url.trim());
-      const isStatsFilled = Boolean(
-        data.stats.yardage.trim() &&
-          data.stats.par > 0 &&
-          data.stats.slope > 0 &&
-          data.stats.holes > 0 &&
-          data.stats.tees > 0 &&
-          data.stats.rating > 0 &&
-          data.stats.elevation.trim() &&
-          data.stats.avgTime.trim() &&
-          data.stats.courseType.trim() &&
-          data.stats.difficulty.trim()
-      );
-      const isSignatureHoleFilled = Boolean(
-        data.signatureHole.number.trim() &&
-          data.signatureHole.name.trim() &&
-          data.signatureHole.notes.trim() &&
-          data.signatureHole.par > 0 &&
-          data.signatureHole.yardage > 0 &&
-          newSignatureHoleImageId
-      );
+      const filledHoleVideos = data.holeVideos.filter((v) => v.holeNumber > 0 || v.url.trim());
 
       const payload: Record<string, unknown> = {
         name: data.name,
@@ -285,45 +261,16 @@ const EditClub = () => {
         facilities: filledFacilities,
         gallery: galleryIds,
       };
+      
       if (data.summary.trim()) payload.summary = data.summary;
       if (data.description.trim()) payload.description = data.description;
       if (newHeroImageId) payload.heroImage = newHeroImageId;
-      if (isStatsFilled) payload.stats = data.stats;
-      if (filledSellingPoints.length > 0) payload.sellingPoints = filledSellingPoints;
-      if (filledHoleVideos.length > 0) payload.holeVideos = filledHoleVideos;
-      if (isSignatureHoleFilled) {
-        payload.signatureHole = { ...data.signatureHole, image: newSignatureHoleImageId };
-      }
-
-      // Each group above is all-or-nothing server-side. If the user clearly
-      // started filling one in but left it incomplete, it gets silently
-      // dropped from the payload above — surface that instead of staying quiet.
-      const isStatsTouched = Boolean(
-        data.stats.yardage.trim() ||
-          data.stats.elevation.trim() ||
-          data.stats.avgTime.trim() ||
-          data.stats.courseType.trim() ||
-          data.stats.difficulty.trim() ||
-          data.stats.par > 0 ||
-          data.stats.slope > 0 ||
-          data.stats.rating > 0 ||
-          data.stats.tees > 0
-      );
-      const isSignatureHoleTouched = Boolean(
-        data.signatureHole.number.trim() ||
-          data.signatureHole.name.trim() ||
-          data.signatureHole.notes.trim() ||
-          data.signatureHole.par > 0 ||
-          data.signatureHole.yardage > 0 ||
-          data.signatureHole.image
-      );
-      const isSellingPointsTouched = data.sellingPoints.some((sp) => sp.title.trim() || sp.description.trim());
-
-      const skippedSections: string[] = [];
-      if (isStatsTouched && !isStatsFilled) skippedSections.push("Course Specs & Metrics");
-      if (isSignatureHoleTouched && !isSignatureHoleFilled) skippedSections.push("Signature Hole Showcase");
-      if (isSellingPointsTouched && filledSellingPoints.length === 0) skippedSections.push("Selling Points");
-      if (filledFacilities.length < data.facilities.length) skippedSections.push("Practice & Playing Facilities (incomplete entries)");
+      
+      // Send stats and signature hole regardless of completion status
+      payload.stats = data.stats;
+      payload.sellingPoints = filledSellingPoints;
+      payload.holeVideos = filledHoleVideos;
+      payload.signatureHole = { ...data.signatureHole, image: newSignatureHoleImageId };
 
       const res = await fetchUrl("/courses/mine", { method: "PATCH", body: payload });
       const course = res.data;
@@ -344,14 +291,7 @@ const EditClub = () => {
         { keepDirty: false }
       );
 
-      if (skippedSections.length > 0) {
-        toast.warning(
-          `Saved, but these sections weren't — fill in every field in each before saving: ${skippedSections.join(", ")}.`,
-          { duration: 8000 }
-        );
-      } else {
-        toast.success("Club profile updated!");
-      }
+      toast.success("Club profile updated!");
     } catch (err: any) {
       const fieldErrors: { field?: string; message: string }[] | undefined = err.data?.errors;
       if (fieldErrors?.length) {

@@ -59,7 +59,6 @@ const Sidebar = () => {
 
   const handleLogout = () => {
     logout();
-    router.replace("/sign-in");
   };
 
   const initials = user?.name

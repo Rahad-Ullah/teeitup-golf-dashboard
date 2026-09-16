@@ -17,9 +17,11 @@ export default function RootLayout({
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.replace("/sign-in");
+      // Use window.location.href instead of router.replace for auth redirects
+      // to guarantee a clean slate and avoid Next.js client-side router hangs.
+      window.location.href = "/sign-in";
     }
-  }, [isLoading, user, router]);
+  }, [isLoading, user]);
 
   // While session is being restored or user just logged in and state is
   // propagating, show a neutral loading screen — do NOT redirect yet.
@@ -32,9 +34,18 @@ export default function RootLayout({
   }
 
   // After loading is complete, if there is still no user the useEffect above
-  // will redirect. Render nothing in the meantime to avoid a flash.
+  // will redirect. Render a fallback UI in the meantime to avoid a flash,
+  // but we MUST render {children} (even if hidden) so Next.js doesn't crash
+  // and router.replace() works correctly.
   if (!user) {
-    return null;
+    return (
+      <>
+        <div className="flex min-h-screen items-center justify-center bg-[#f8fafc] text-gray-400">
+          Redirecting...
+        </div>
+        <div className="hidden">{children}</div>
+      </>
+    );
   }
 
   if (user.mustResetPassword) {
