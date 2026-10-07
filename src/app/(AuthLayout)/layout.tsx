@@ -1,10 +1,4 @@
-import type { Metadata } from "next";
 import AuthLeft from "./AuthLeft";
-
-export const metadata: Metadata = {
-  title: "Tee-It-Up Admin | Sign In",
-  description: "Golf club management portal",
-};
 
 export default function AuthRootLayout({
   children,
