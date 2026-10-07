@@ -27,7 +27,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL("https://dashboard.teeitupgolf.com.au"),
   title: {
-    default: "Tee It Up Golf | Management Dashboard",
+    default: "Dashboard | Tee It Up Golf",
     template: "%s | Tee It Up Golf",
   },
   description:

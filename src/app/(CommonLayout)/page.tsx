@@ -4,6 +4,12 @@ import RecentRequest from "@/components/home/RecentRequest";
 import RequestOverview from "@/components/home/RequestOverview";
 import DashboardCharts from "@/components/home/DashboardCharts";
 
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Dashboard",
+};
+
 export default function Home() {
   return (
     <div className="flex flex-col gap-6">
