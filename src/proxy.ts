@@ -1,38 +1,47 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+const AUTH_ROUTES = [
+    "/sign-in",
+    "/forgot-password",
+    "/verify-otp",
+    "/reset-password",
+];
+
 export function proxy(request: NextRequest) {
-  const token = request.cookies.get("tiu_refresh_token_dashboard")?.value;
-  const { pathname } = request.nextUrl;
+    const token = request.cookies.get("accessToken")?.value;
+    const { pathname } = request.nextUrl;
 
-  const isAuthPage = pathname.startsWith("/sign-in") ||
-                     pathname.startsWith("/forgot-password") ||
-                     pathname.startsWith("/verify-otp") ||
-                     pathname.startsWith("/reset-password");
+    const isAuthPage = AUTH_ROUTES.some((route) => pathname.startsWith(route));
 
-  // If no refresh token cookie exists and the user is trying to access a protected page, redirect to sign-in
-  if (!token && !isAuthPage) {
-    const signInUrl = new URL("/sign-in", request.url);
-    return NextResponse.redirect(signInUrl);
-  }
+    // 1. Unauthenticated users cannot access private pages
+    if (!token && !isAuthPage) {
+        const signInUrl = new URL("/sign-in", request.url);
+        // Don't append search params if already on root to keep URLs clean
+        if (pathname !== "/") {
+            signInUrl.searchParams.set("from", pathname);
+        }
+        return NextResponse.redirect(signInUrl);
+    }
 
-  // We no longer redirect away from auth pages in the proxy. The cookie might
-  // exist but be revoked/expired. It's safer to let the client-side AuthContext
-  // verify the session and redirect them to the dashboard if it's truly valid.
+    // 2. Authenticated users cannot access auth pages
+    if (token && isAuthPage) {
+        return NextResponse.redirect(new URL("/", request.url));
+    }
 
-  return NextResponse.next();
+    return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for:
-     * - api routes
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - uploads/public files
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico|uploads).*)",
-  ],
+    matcher: [
+        /*
+         * Match all request paths except:
+         * - _next/static (static files)
+         * - _next/image (image optimization files)
+         * - favicon.ico (favicon file)
+         * - public folder files with extensions (e.g. .svg, .png, .jpg, .jpeg, .gif, .webp)
+         * - api routes
+         */
+        "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    ],
 };

@@ -8,7 +8,11 @@ import {
   ReactNode,
 } from "react";
 import { fetchUrl } from "@/lib/fetchUrl";
-import { setClientToken } from "@/lib/apiToken";
+import {
+  setClientToken,
+  setAccessTokenCookie,
+  removeAccessTokenCookie,
+} from "@/lib/apiToken";
 import { decodeAccessToken } from "@/lib/jwt";
 
 export type Role = "admin" | "club_owner";
@@ -52,6 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setClientToken(accessToken);
+      setAccessTokenCookie(accessToken);
       const claims = decodeAccessToken(accessToken);
 
       if (claims?.mustResetPassword) {
@@ -70,6 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     } catch (err) {
       console.log("No active session or session restoration failed");
+      removeAccessTokenCookie();
       setUser(null);
     }
   };
@@ -86,7 +92,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       const { accessToken, user: dbUser } = result.data;
+
+      // Set token to cookies and client state
+      setAccessTokenCookie(accessToken);
       setClientToken(accessToken);
+
 
       const authUser: AuthUser = {
         name: dbUser.fullName,
@@ -113,12 +123,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Logout request failed", err);
     } finally {
       setClientToken("");
-      
+      removeAccessTokenCookie();
+
       if (typeof window !== "undefined") {
         // Clear localStorage and sessionStorage completely
         window.localStorage.clear();
         window.sessionStorage.clear();
-        
+
         // Clear all accessible cookies
         document.cookie.split(";").forEach((c) => {
           document.cookie = c
