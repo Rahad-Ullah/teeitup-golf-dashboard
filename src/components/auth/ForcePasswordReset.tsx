@@ -34,7 +34,7 @@ const ForcePasswordReset = () => {
         body: { currentPassword: data.currentPassword, newPassword: data.newPassword },
       });
       toast.success("Password changed! Loading your dashboard...");
-      await refreshSession();
+      await refreshSession(true);
     } catch (err: any) {
       toast.error(err.message || "Failed to change password.");
     } finally {
