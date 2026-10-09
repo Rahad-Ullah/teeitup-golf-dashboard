@@ -8,6 +8,7 @@ import {
   useCallback,
   ReactNode,
 } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { fetchUrl, BASE_URL, CLIENT_APP_HEADER, CLIENT_APP } from "@/lib/fetchUrl";
 import {
   getAccessToken,
@@ -35,7 +36,7 @@ const toRole = (backendRole: string): Role =>
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string; mustResetPassword?: boolean }>;
   logout: () => Promise<void>;
   refreshSession: (force?: boolean) => Promise<string | null>;
 }
@@ -43,8 +44,17 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Automatically enforce password change redirection across the app
+  useEffect(() => {
+    if (!isLoading && user && user?.mustResetPassword && pathname !== "/change-password") {
+      router.replace("/change-password");
+    }
+  }, [isLoading, user?.mustResetPassword, pathname, router]);
 
   // Load user profile using the current access token
   const fetchUserProfile = useCallback(async (token: string): Promise<boolean> => {
@@ -208,7 +218,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       };
 
       setUser(authUser);
-      return { success: true };
+      return { success: true, mustResetPassword: authUser.mustResetPassword };
     } catch (err: any) {
       return {
         success: false,

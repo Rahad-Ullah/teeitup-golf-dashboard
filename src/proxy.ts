@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { decodeAccessToken, isTokenValid } from "@/lib/jwt";
 
 const AUTH_ROUTES = [
   "/sign-in",
@@ -15,22 +16,40 @@ export function proxy(request: NextRequest) {
     request.cookies.get("tiu_refresh_token")?.value ||
     request.cookies.get("refreshToken")?.value;
 
-  const hasAuth = Boolean(accessToken || refreshToken);
+  // Validate token validity (checks JWT structure and expiration)
+  const hasValidAccessToken = isTokenValid(accessToken);
+  const hasValidRefreshToken = refreshToken && isTokenValid(refreshToken);
+  const hasAuth = hasValidAccessToken || hasValidRefreshToken;
   const { pathname } = request.nextUrl;
 
   const isAuthPage = AUTH_ROUTES.some((route) => pathname.startsWith(route));
+  const isChangePasswordPage = pathname.startsWith("/change-password");
 
-  // 1. Unauthenticated users cannot access private pages
-  if (!hasAuth && !isAuthPage) {
-    const signInUrl = new URL("/sign-in", request.url);
-    if (pathname !== "/") {
-      signInUrl.searchParams.set("from", pathname);
+  // 1. Unauthenticated users cannot access private pages or change-password
+  if (!hasAuth) {
+    if (!isAuthPage) {
+      const signInUrl = new URL("/sign-in", request.url);
+      if (pathname !== "/") {
+        signInUrl.searchParams.set("from", pathname);
+      }
+      return NextResponse.redirect(signInUrl);
     }
-    return NextResponse.redirect(signInUrl);
+    return NextResponse.next();
   }
 
-  // 2. Authenticated users cannot access auth entry pages
-  if (hasAuth && isAuthPage) {
+  // 2. Users required to change password can ONLY access /change-password
+  const claims = accessToken ? decodeAccessToken(accessToken) : null;
+  const mustResetPassword = Boolean(claims?.mustResetPassword);
+
+  if (mustResetPassword) {
+    if (!isChangePasswordPage) {
+      return NextResponse.redirect(new URL("/change-password", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // 3. Authenticated users who do NOT need password reset cannot access auth pages
+  if (isAuthPage) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

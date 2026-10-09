@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import InputFieldPassword from "@/components/form/InputFieldPassword";
 import { fetchUrl } from "@/lib/fetchUrl";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ChangePasswordFormValues {
   oldPassword: string;
@@ -15,7 +16,7 @@ interface ChangePasswordFormValues {
 }
 
 const ChangePassword = () => {
-  const router = useRouter();
+  const { logout } = useAuth();
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -62,7 +63,7 @@ const ChangePassword = () => {
     setIsSubmitting(true);
 
     try {
-      await fetchUrl("/auth/change-password", {
+      const res = await fetchUrl("/auth/change-password", {
         method: "POST",
         body: {
           currentPassword: data.oldPassword,
@@ -71,9 +72,14 @@ const ChangePassword = () => {
         },
       });
 
-      toast.success("Password changed successfully!");
-      reset();
-      router.replace("/");
+      if (res?.success) {
+        toast.success("Password changed successfully!");
+        reset();
+
+        // logout and redirect to login
+        logout();
+      }
+
     } catch (err: any) {
       const errMsg = err?.message || "Failed to change password.";
       setFormError(errMsg);

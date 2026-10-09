@@ -22,7 +22,11 @@ const SignIn = () => {
 
   useEffect(() => {
     if (user) {
-      router.replace("/");
+      if (user.mustResetPassword) {
+        router.replace("/change-password");
+      } else {
+        router.replace("/");
+      }
     }
   }, [user, router]);
 
@@ -48,7 +52,11 @@ const SignIn = () => {
     }
 
     toast.success("Welcome back! Logged in successfully.");
-    router.replace("/");
+    if (result.mustResetPassword) {
+      router.replace("/change-password");
+    } else {
+      router.replace("/");
+    }
   };
 
   return (
