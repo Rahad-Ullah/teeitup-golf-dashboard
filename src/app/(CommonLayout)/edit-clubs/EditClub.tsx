@@ -1,13 +1,13 @@
+"use no memo";
 "use client";
 
-import { useEffect, useState } from "react";
-import { useForm, useFieldArray, SubmitHandler, Controller } from "react-hook-form";
+import { useEffect, useState, useRef } from "react";
+import { useForm, useFieldArray, SubmitHandler, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
   Trash2,
-  Image as ImageIcon,
   Tag,
   CheckCircle2,
   Trophy,
@@ -21,6 +21,7 @@ import {
   ArrowLeft,
   ShieldCheck,
   Mail,
+  ImageIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -64,18 +65,21 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
   const [signatureHoleImageId, setSignatureHoleImageId] = useState<string | undefined>(undefined);
   const [courseOwnerEmail, setCourseOwnerEmail] = useState<string | null>(null);
 
+  const loadedCourseIdRef = useRef<string | null>(null);
+
   const {
     register,
     control,
     handleSubmit,
     reset,
     setError,
-    watch,
     formState: { errors },
   } = useForm<EditClubFormValues>({
     resolver: zodResolver(editClubSchema),
     defaultValues: defaultEditClubValues,
   });
+
+  const watchedHoleVideos = useWatch({ control, name: "holeVideos" }) || [];
 
   const {
     fields: facilityFields,
@@ -96,6 +100,11 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
   } = useFieldArray({ control, name: "holeVideos" });
 
   useEffect(() => {
+    const targetKey = targetCourseId || (isAdmin ? "admin-first" : "mine");
+    if (loadedCourseIdRef.current === targetKey) {
+      return;
+    }
+
     const loadCourse = async () => {
       setIsLoading(true);
       setLoadError(null);
@@ -188,6 +197,8 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
           })),
           holeVideos: course.holeVideos ?? [],
         });
+
+        loadedCourseIdRef.current = targetKey;
       } catch (err: any) {
         setLoadError(err.message || "Failed to load club profile.");
       } finally {
@@ -196,7 +207,7 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
     };
 
     loadCourse();
-  }, [reset, targetCourseId, isAdmin]);
+  }, [targetCourseId, isAdmin]);
 
   const uploadImage = async (file: File, type: string): Promise<string> => {
     const formData = new FormData();
@@ -268,6 +279,9 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
 
       setHeroImageId(course?.heroImage?._id ?? newHeroImageId);
       setSignatureHoleImageId(course?.signatureHole?.image?._id ?? newSignatureHoleImageId);
+
+      const targetKey = targetCourseId || (isAdmin ? "admin-first" : "mine");
+      loadedCourseIdRef.current = targetKey;
 
       reset(
         {
@@ -406,6 +420,7 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
                         { label: "Pending (Under Review)", value: "PENDING" },
                         { label: "Suspended (Hidden)", value: "SUSPENDED" },
                       ]}
+                      control={control}
                       register={register}
                       error={errors.status}
                     />
@@ -463,17 +478,17 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                   <div className="space-y-6">
-                    <InputField title="Club Name" name="name" register={register} error={errors.name} />
-                    <InputField title="Location (City, State)" name="location" register={register} error={errors.location} />
+                    <InputField title="Club Name" name="name" control={control} register={register} error={errors.name} />
+                    <InputField title="Location (City, State)" name="location" control={control} register={register} error={errors.location} />
 
                     <div className="grid grid-cols-2 gap-4">
-                      <InputField title="Average Rating" name="rating" type="number" register={register} rules={{ valueAsNumber: true }} error={errors.rating} disabled />
-                      <InputField title="Verified Reviews Count" name="reviewsCount" type="number" register={register} rules={{ valueAsNumber: true }} error={errors.reviewsCount} disabled />
+                      <InputField title="Average Rating" name="rating" type="number" control={control} register={register} rules={{ valueAsNumber: true }} error={errors.rating} disabled />
+                      <InputField title="Verified Reviews Count" name="reviewsCount" type="number" control={control} register={register} rules={{ valueAsNumber: true }} error={errors.reviewsCount} disabled />
                     </div>
                     <p className="text-xs text-slate-400 -mt-2">Rating and review count are calculated automatically from player reviews.</p>
 
-                    <TextareaField title="Brief Summary (Hero Tagline)" name="summary" register={register} error={errors.summary} />
-                    <TextareaField title="Detailed Course Overview Description" name="description" register={register} error={errors.description} rows={6} />
+                    <TextareaField title="Brief Summary (Hero Tagline)" name="summary" control={control} register={register} error={errors.summary} />
+                    <TextareaField title="Detailed Course Overview Description" name="description" control={control} register={register} error={errors.description} rows={6} />
                   </div>
 
                   <div>
@@ -498,10 +513,10 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                  <InputField title="Total Yardage" name="stats.yardage" register={register} error={errors.stats?.yardage} />
-                  <InputField title="Par Rating" name="stats.par" type="number" register={register} rules={{ valueAsNumber: true }} error={errors.stats?.par} />
-                  <InputField title="Slope Rating" name="stats.slope" type="number" register={register} rules={{ valueAsNumber: true }} error={errors.stats?.slope} />
-                  <InputField title="Course Rating" name="stats.rating" type="number" register={register} rules={{ valueAsNumber: true }} error={errors.stats?.rating} />
+                  <InputField title="Total Yardage" name="stats.yardage" control={control} register={register} error={errors.stats?.yardage} />
+                  <InputField title="Par Rating" name="stats.par" type="number" control={control} register={register} rules={{ valueAsNumber: true }} error={errors.stats?.par} />
+                  <InputField title="Slope Rating" name="stats.slope" type="number" control={control} register={register} rules={{ valueAsNumber: true }} error={errors.stats?.slope} />
+                  <InputField title="Course Rating" name="stats.rating" type="number" control={control} register={register} rules={{ valueAsNumber: true }} error={errors.stats?.rating} />
                   <SelectField
                     title="Number of Holes (Course Total)"
                     name="stats.holes"
@@ -509,15 +524,16 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
                       { label: "9 Holes", value: 9 },
                       { label: "18 Holes", value: 18 },
                     ]}
+                    control={control}
                     register={register}
                     rules={{ valueAsNumber: true }}
                     error={errors.stats?.holes}
                   />
-                  <InputField title="Number of Tee Boxes" name="stats.tees" type="number" register={register} rules={{ valueAsNumber: true }} error={errors.stats?.tees} />
-                  <InputField title="Elevation Changes" name="stats.elevation" register={register} error={errors.stats?.elevation} />
-                  <InputField title="Average Round Time" name="stats.avgTime" register={register} error={errors.stats?.avgTime} />
-                  <InputField title="Course Type" name="stats.courseType" register={register} error={errors.stats?.courseType} />
-                  <InputField title="Difficulty Level" name="stats.difficulty" register={register} error={errors.stats?.difficulty} />
+                  <InputField title="Number of Tee Boxes" name="stats.tees" type="number" control={control} register={register} rules={{ valueAsNumber: true }} error={errors.stats?.tees} />
+                  <InputField title="Elevation Changes" name="stats.elevation" control={control} register={register} error={errors.stats?.elevation} />
+                  <InputField title="Average Round Time" name="stats.avgTime" control={control} register={register} error={errors.stats?.avgTime} />
+                  <InputField title="Course Type" name="stats.courseType" control={control} register={register} error={errors.stats?.courseType} />
+                  <InputField title="Difficulty Level" name="stats.difficulty" control={control} register={register} error={errors.stats?.difficulty} />
                 </div>
               </section>
 
@@ -539,12 +555,14 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
                       <InputField
                         title="Selling Point Title"
                         name={`sellingPoints.${index}.title`}
+                        control={control}
                         register={register}
                         error={errors.sellingPoints?.[index]?.title}
                       />
                       <TextareaField
                         title="Selling Point Description"
                         name={`sellingPoints.${index}.description`}
+                        control={control}
                         register={register}
                         error={errors.sellingPoints?.[index]?.description}
                         rows={3}
@@ -596,6 +614,7 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
                             title="Facility Name"
                             name={`facilities.${index}.name`}
                             placeholder="e.g. 350-Yard Driving Range"
+                            control={control}
                             register={register}
                             error={errors.facilities?.[index]?.name}
                           />
@@ -603,6 +622,7 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
                             title="Facility Description"
                             name={`facilities.${index}.description`}
                             placeholder="Describe targets, size, availability..."
+                            control={control}
                             register={register}
                             error={errors.facilities?.[index]?.description}
                             rows={2}
@@ -626,16 +646,16 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                   <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
-                      <InputField title="Which Hole # (e.g. 14)" name="signatureHole.number" register={register} error={errors.signatureHole?.number} />
-                      <InputField title="Hole Name" name="signatureHole.name" register={register} error={errors.signatureHole?.name} />
+                      <InputField title="Which Hole # (e.g. 14)" name="signatureHole.number" control={control} register={register} error={errors.signatureHole?.number} />
+                      <InputField title="Hole Name" name="signatureHole.name" control={control} register={register} error={errors.signatureHole?.name} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <InputField title="Par Rating" name="signatureHole.par" type="number" register={register} rules={{ valueAsNumber: true }} error={errors.signatureHole?.par} />
-                      <InputField title="Yardage" name="signatureHole.yardage" type="number" register={register} rules={{ valueAsNumber: true }} error={errors.signatureHole?.yardage} />
+                      <InputField title="Par Rating" name="signatureHole.par" type="number" control={control} register={register} rules={{ valueAsNumber: true }} error={errors.signatureHole?.par} />
+                      <InputField title="Yardage" name="signatureHole.yardage" type="number" control={control} register={register} rules={{ valueAsNumber: true }} error={errors.signatureHole?.yardage} />
                     </div>
 
-                    <TextareaField title="Strategic Playing Notes" name="signatureHole.notes" register={register} error={errors.signatureHole?.notes} rows={4} />
+                    <TextareaField title="Strategic Playing Notes" name="signatureHole.notes" control={control} register={register} error={errors.signatureHole?.notes} rows={4} />
                   </div>
 
                   <div>
@@ -650,25 +670,25 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
                 </div>
               </section>
 
-              {/* SECTION 6: COURSE GALLERY */}
+              {/* SECTION 6: PHOTO GALLERY */}
               <section className="bg-white border border-slate-200 rounded-3xl p-8 shadow-xs relative">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
+                    <div className="p-3 bg-sky-50 rounded-xl text-sky-600">
                       <ImageIcon size={24} />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-800">Course Photo Gallery</h2>
+                    <h2 className="text-2xl font-bold text-slate-800">Visual Gallery</h2>
                   </div>
                   <button
                     type="button"
-                    onClick={() => appendGallery({ src: "" })}
-                    className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border border-blue-100 cursor-pointer self-start"
+                    onClick={() => appendGallery({ src: "", mediaId: "" })}
+                    className="flex items-center gap-2 bg-sky-50 hover:bg-sky-100 text-sky-600 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border border-sky-100 cursor-pointer self-start"
                   >
                     <Plus size={18} /> Add Photo
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   <AnimatePresence mode="popLayout">
                     {galleryFields.map((field, index) => (
                       <motion.div
@@ -677,16 +697,15 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        className="group bg-slate-50 border border-slate-200 p-4 rounded-2xl relative hover:border-blue-300 transition-all shadow-xs"
+                        className="group relative bg-slate-50 border border-slate-200 rounded-2xl p-4 hover:border-sky-300 transition-all shadow-xs"
                       >
                         <button
                           type="button"
                           onClick={() => removeGallery(index)}
-                          className="absolute -top-3 -right-3 bg-white hover:bg-red-500 text-slate-400 hover:text-white rounded-full p-2 transition-all shadow-sm border border-slate-200 hover:border-red-500 z-10 cursor-pointer"
+                          className="absolute top-6 right-6 z-10 bg-white/90 hover:bg-white text-slate-400 hover:text-red-500 transition-all p-2 rounded-xl shadow-xs"
                         >
-                          <X size={14} />
+                          <Trash2 size={16} />
                         </button>
-
                         <Controller
                           control={control}
                           name={`gallery.${index}.src` as const}
@@ -702,8 +721,8 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
 
               {/* SECTION 7: COURSE HOLE VIDEOS */}
               {(() => {
-                const holeVideos = watch("holeVideos") || [];
-                const usedHoles = new Set(holeVideos.map((v) => v.holeNumber));
+                const holeVideos = watchedHoleVideos;
+                const usedHoles = new Set((holeVideos || []).map((v) => v.holeNumber));
                 const nextAvailableHole =
                   Array.from({ length: 18 }, (_, i) => i + 1).find((n) => !usedHoles.has(n)) ?? null;
 
@@ -790,6 +809,7 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
                                 title="Video URL"
                                 name={`holeVideos.${index}.url`}
                                 placeholder="https://..."
+                                control={control}
                                 register={register}
                                 error={errors.holeVideos?.[index]?.url}
                               />
