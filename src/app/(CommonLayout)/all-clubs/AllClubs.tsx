@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { AnimatePresence, motion } from "framer-motion";
-import { MapPin, Mail, Clock, Plus, X, Building2, Info, Loader2, CheckCircle2, AlertCircle, Sparkles, Trophy, Check, HelpCircle } from "lucide-react";
+import Link from "next/link";
+import { MapPin, Mail, Clock, Plus, X, Building2, Info, Loader2, CheckCircle2, AlertCircle, Sparkles, Trophy, Check, HelpCircle, Edit } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import RequireRole from "@/components/auth/RequireRole";
@@ -338,23 +339,28 @@ const AllClubs = () => {
                       </button>
                     </td>
                     <td className="px-6 py-5 text-right">
-                      {club.status === "Pending" ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleApprove(club.id);
-                          }}
-                          disabled={isUpdating === club.id}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60"
+                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        {club.status === "Pending" ? (
+                          <button
+                            onClick={() => handleApprove(club.id)}
+                            disabled={isUpdating === club.id}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60 shadow-xs"
+                          >
+                            {isUpdating === club.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : null}
+                            Approve
+                          </button>
+                        ) : null}
+                        <Link
+                          href={`/edit-clubs?id=${club.id}`}
+                          className="bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-700 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer inline-flex items-center gap-1.5 border border-slate-200 shadow-xs"
+                          title="Edit Club Details"
                         >
-                          {isUpdating === club.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : null}
-                          Approve
-                        </button>
-                      ) : (
-                        <span className="text-gray-400 text-xs font-semibold">Active</span>
-                      )}
+                          <Edit className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Edit</span>
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -510,6 +516,13 @@ const AllClubs = () => {
                     </p>
                   </div>
                   <div className="ml-auto flex items-center gap-2">
+                    <Link
+                      href={`/edit-clubs?id=${selectedClub.id}`}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all shadow-md shadow-emerald-600/10 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      <span>Edit Club</span>
+                    </Link>
                     <span
                       className={cn(
                         "px-3 py-1 rounded-full text-xs font-bold border",
@@ -707,7 +720,14 @@ const AllClubs = () => {
                 </div>
 
                 {/* Footer buttons */}
-                <div className="pt-6 mt-6 border-t border-slate-100 flex justify-end gap-3 shrink-0">
+                <div className="pt-6 mt-6 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+                  <Link
+                    href={`/edit-clubs?id=${selectedClub.id}`}
+                    className="py-3 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-all shadow-md shadow-emerald-600/10 inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <Edit className="w-4 h-4" />
+                    <span>Edit Club Details</span>
+                  </Link>
                   <button
                     type="button"
                     onClick={() => setSelectedClub(null)}
