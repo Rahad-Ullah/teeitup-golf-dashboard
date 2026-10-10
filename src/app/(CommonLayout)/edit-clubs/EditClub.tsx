@@ -380,7 +380,7 @@ const EditClub = ({ clubId: propClubId }: EditClubProps = {}) => {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-12">
               {/* ADMIN CONTROLS SECTION */}
               {isAdmin && (
-                <section className="bg-gradient-to-r from-emerald-50/70 via-teal-50/50 to-slate-50 border border-emerald-200/80 rounded-3xl p-8 shadow-xs">
+                <section className="bg-linear-to-r from-emerald-50/70 via-teal-50/50 to-slate-50 border border-emerald-200/80 rounded-3xl p-8 shadow-xs">
                   <div className="flex flex-wrap items-center gap-3 mb-6">
                     <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-sm">
                       <ShieldCheck size={22} />

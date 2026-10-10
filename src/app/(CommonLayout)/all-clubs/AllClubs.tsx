@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { MapPin, Mail, Clock, Plus, X, Building2, Info, Loader2, CheckCircle2, AlertCircle, Sparkles, Trophy, Check, HelpCircle, Edit } from "lucide-react";
+import { MapPin, Mail, Clock, Plus, X, Building2, Info, Loader2, CheckCircle2, AlertCircle, AlertTriangle, Sparkles, Trophy, Check, HelpCircle, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import RequireRole from "@/components/auth/RequireRole";
@@ -82,6 +82,8 @@ const AllClubs = () => {
   const [selectedClub, setSelectedClub] = useState<ClubRow | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [clubToDelete, setClubToDelete] = useState<ClubRow | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
     register,
@@ -173,6 +175,26 @@ const AllClubs = () => {
       toast.error(err.message || "Failed to update featured status.");
     } finally {
       setIsUpdating(null);
+    }
+  };
+
+  const handleDeleteClub = async () => {
+    if (!clubToDelete) return;
+    setIsDeleting(true);
+    try {
+      await fetchUrl(`/courses/${clubToDelete.id}`, {
+        method: "DELETE",
+      });
+      toast.success(`"${clubToDelete.name}" has been deleted.`);
+      setClubList((prev) => prev.filter((c) => c.id !== clubToDelete.id));
+      if (selectedClub && selectedClub.id === clubToDelete.id) {
+        setSelectedClub(null);
+      }
+      setClubToDelete(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete club.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -360,6 +382,13 @@ const AllClubs = () => {
                           <Edit className="w-3.5 h-3.5 text-slate-500" />
                           <span>Edit</span>
                         </Link>
+                        <button
+                          onClick={() => setClubToDelete(club)}
+                          className="bg-slate-100 hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-slate-400 hover:text-red-600 font-bold p-1.5 rounded-xl text-xs transition-all cursor-pointer inline-flex items-center border border-slate-200 shadow-xs"
+                          title="Delete Club"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -721,13 +750,23 @@ const AllClubs = () => {
 
                 {/* Footer buttons */}
                 <div className="pt-6 mt-6 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
-                  <Link
-                    href={`/edit-clubs?id=${selectedClub.id}`}
-                    className="py-3 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-all shadow-md shadow-emerald-600/10 inline-flex items-center gap-2 cursor-pointer"
-                  >
-                    <Edit className="w-4 h-4" />
-                    <span>Edit Club Details</span>
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/edit-clubs?id=${selectedClub.id}`}
+                      className="py-3 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-all shadow-md shadow-emerald-600/10 inline-flex items-center gap-2 cursor-pointer"
+                    >
+                      <Edit className="w-4 h-4" />
+                      <span>Edit Club Details</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setClubToDelete(selectedClub)}
+                      className="py-3 px-4 rounded-xl border border-red-200 hover:bg-red-50 text-red-600 text-sm font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Delete</span>
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setSelectedClub(null)}
@@ -740,6 +779,84 @@ const AllClubs = () => {
             </div>
           );
         })()}
+      </AnimatePresence>
+          {/* DELETE CONFIRMATION MODAL */}
+      <AnimatePresence>
+        {clubToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isDeleting && setClubToDelete(null)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: "spring", duration: 0.3 }}
+              className="relative w-full max-w-md bg-white rounded-3xl p-6 md:p-8 border border-slate-100 shadow-2xl z-10 overflow-hidden"
+            >
+              {/* Close Button */}
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setClubToDelete(null)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2 rounded-lg transition-colors cursor-pointer disabled:opacity-40"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex flex-col items-center text-center">
+                <div className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mb-5 border border-red-100">
+                  <AlertTriangle className="w-7 h-7" />
+                </div>
+
+                <h3 className="text-xl font-bold text-slate-900 leading-tight">
+                  Delete Golf Club?
+                </h3>
+                <p className="text-sm text-slate-500 mt-2.5 leading-relaxed">
+                  Are you sure you want to delete{" "}
+                  <strong className="text-slate-900 font-semibold">{clubToDelete.name}</strong>?
+                  This action will remove the club from the platform, deactivate manager access, and unpublish its tee times.
+                </p>
+
+                <div className="flex gap-3 w-full mt-7">
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() => setClubToDelete(null)}
+                    className="flex-1 py-3 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={handleDeleteClub}
+                    className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-all cursor-pointer shadow-lg shadow-red-600/20 inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Deleting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete Club</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </RequireRole>
   );
